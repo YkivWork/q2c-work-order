@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:create-workorder.xml"/>
+        <spring:import resource="classpath:globals.xml"/>
+        <spring:import resource="classpath:error-handling.xml"/>
+        <spring:import resource="classpath:create-non-closure-wo.xml"/>
+        <spring:import resource="classpath:create-closure-wo.xml"/>
+        <spring:import resource="classpath:process-non-closure-wo.xml"/>
+        <spring:import resource="classpath:process-closure-wo.xml"/>
+        <spring:import resource="classpath:mdr.xml"/>
+    </spring:beans>
+    <munit:test name="create-non-closure-wo-test-suite-createNonClosureWorkOrderTest" description="Test">
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="HTTP_Request_Configuration_to_Aria"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-failed-response.xml').asString()]" mimeType="application/xml"/>
+        </mock:when>
+        <munit:set payload="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Set Message"/>
+        <flow-ref name="createNonClosureWorkOrder" doc:name="createNonClosureWorkOrder"/>
+        <munit:assert-on-equals message="errorCode is invalid" expectedValue="1010" actualValue="#[payload.errorCode]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="errorMessage is invalid" expectedValue="Missing required parameter: client_sku" actualValue="#[payload.errorMessage]" doc:name="Assert Equals"/>
+    </munit:test>
+</mule>

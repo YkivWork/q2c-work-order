@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    <flow name="createNonClosureWorkOrder">
+        <logger message="Starting createNonClosureWorkOrder" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Create Soap Message Aria">
+            <dw:set-payload resource="classpath:dataweave/create-nonclosure-wo.dwl"/>
+        </dw:transform-message>
+        <logger message="Request sent to Aria - Non Closure WorkOrder Create #[message.payloadAs(java.lang.String)]" level="DEBUG" doc:name="Logger"/>
+        <http:request config-ref="HTTP_Request_Configuration_to_Sys_Aria" path="${aria.nonClosure.path}" method="POST" doc:name="createOrderAria">
+        </http:request>
+        <logger message="Back from Aria - Non Closure WorkOrder Create #[message.payloadAs(java.lang.String)]" level="DEBUG" doc:name="Logger"/>
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+
+        <dw:transform-message doc:name="Parse WorkOrder Response">
+          <dw:set-variable variableName="ariaResults" resource="classpath:dataweave/parse-wo-response.dwl"/>
+        </dw:transform-message>
+
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.ariaResults.error_msg == 'OK']">
+                <dw:transform-message doc:name="Set orderNumber">
+                    <dw:set-payload resource="classpath:dataweave/set-ordernumber.dwl"/>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Set errorCode and errorMessage">
+                    <dw:set-payload resource="classpath:dataweave/set-errorcode.dwl"/>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+        <logger message="Ending createNonClosureWorkOrder" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+      xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:spring="http://www.springframework.org/schema/beans"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+
+    <http:request-config name="MDR_HTTP_Configuration" host="${mdr.system.host}" port="${mdr.system.port}" basePath="/" doc:name="HTTP Request Configuration"/>
+    <sub-flow name="workordersActive_Flow">
+        <set-variable variableName="queryPredicate" value="WHERE Status__c = 'Completed' AND CreatedDate &gt;#[flowVars.sfdcPollWorkOrder]" doc:name="Variable"/>
+        <logger message="QueryPredicate #[flowVars.queryPredicate]" level="INFO" doc:name="Logger"/>
+<!--    <sfdc:query config-ref="Salesforce__Basic_Authentication" query="dsql:SELECT Amount__c,Client_SKU__c,CreatedDate,DatasiteOne_Project__c,Description__c,LastModifiedDate,Name,Units__c FROM Work_Order__c #[flowVars.queryPredicate]" doc:name="Salesforce"/> -->
+<!--    <logger message="Found #[payload.size()] workorders After Salesforce Call #[message.payloadAs(java.lang.String)]" level="INFO" doc:name="INFO"/>  -->
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="dsql:SELECT Amount__c,Client_SKU__c,CreatedDate,DatasiteOne_Project__c,Description__c,LastModifiedDate,Name,Units__c FROM Work_Order__c #[flowVars.queryPredicate]" doc:name="Salesforce"/>
+        <dw:transform-message doc:name="Transform to Data Model">
+            <dw:set-payload resource="classpath:dataweave/transform-data-model.dwl"/>
+        </dw:transform-message>
+        <logger message="Returning transformed results from SFDC active work orders.  #[message.payloadAs(java.lang.String)]" level="INFO" doc:name="INFO"/>
+    </sub-flow>
+
+    <flow name="mdrLookupsFlow">
+        <logger message="Starting Call to MDR" level="INFO" doc:name="Logger"/>
+        <set-variable variableName="acctsplit" value="#[new java.util.ArrayList()]" doc:name="Variable"/>
+        <foreach doc:name="For Each">
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-variable resource="classpath:dataweave/get-split.dwl" variableName="split"/>
+            </dw:transform-message>
+            <logger message="The billing company id for this instance: #[payload.billing_company_id]" level="DEBUG" doc:name="Logger"/>
+            <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+                <http:request config-ref="MDR_HTTP_Request_Configuration" path="${mdr.multientity.path}" method="GET" doc:name="getCrossReferenceFromORG">
+                    <http:request-builder>
+                        <http:query-param paramName="entity_type_key" value="ORG"/>
+                        <http:query-param paramName="id_type_key" value="SF_BILLCO"/>
+                        <http:query-param paramName="id_value" value="#[payload.billing_company_id]"/>
+                        <http:query-param paramName="include_deleted_cross_ref" value="0"/>
+                    </http:request-builder>
+                </http:request>
+            </until-successful>
+            <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+            <json:object-to-json-transformer doc:name="Object to JSON"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload resource="classpath:dataweave/org-mdr-initial.dwl"/>
+            </dw:transform-message>
+            <logger message="The AcctId and it's respective Split is:  #[message.payloadAs(java.lang.String)]" level="DEBUG" doc:name="Logger"/>
+            <expression-component doc:name="Expression"><![CDATA[#[flowVars.acctsplit.add(payload)]]]></expression-component>
+        </foreach>
+        <set-payload value="#[flowVars.acctsplit]" doc:name="Set Payload"/>
+        <dw:transform-message doc:name="orgMDR">
+            <dw:set-variable resource="classpath:dataweave/org-mdr.dwl" variableName="orgMDR"/>
+        </dw:transform-message>
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" doc:name="Until Successful" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}">
+        <http:request config-ref="MDR_HTTP_Request_Configuration" path="${mdr.multientity.path}" method="GET" doc:name="getCrossReferenceFromPROJ">
+            <http:request-builder>
+                    <http:query-param paramName="entity_type_key" value="PROJ"/>
+                    <http:query-param paramName="id_type_key" value="SF_Proj"/>
+                    <http:query-param paramName="id_value" value="#[flowVars.sfdcResponse.sfdcProjectId]"/>
+                    <http:query-param paramName="include_deleted_cross_ref" value="0"/>
+            </http:request-builder>
+        </http:request>
+        </until-successful>
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+        <json:object-to-json-transformer doc:name="Object to JSON"/>
+        <logger message="After MDR Call #[message.payloadAs(java.lang.String)]" level="DEBUG" doc:name="Logger"/>
+        <dw:transform-message doc:name="projMDR">
+            <dw:set-variable resource="classpath:dataweave/proj-mdr.dwl" variableName="projMDR"/>
+        </dw:transform-message>
+        <logger message="Ending Call to MDR" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>

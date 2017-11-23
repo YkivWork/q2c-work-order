@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Code Push Change 8/10/17 -->
+<mule xmlns:cluster="http://www.mulesoft.org/schema/mule/ee/cluster" xmlns:secure-property-placeholder="http://www.mulesoft.org/schema/mule/secure-property-placeholder"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+xmlns:http="http://www.mulesoft.org/schema/mule/http"
+xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml"
+xmlns:spring="http://www.springframework.org/schema/beans"
+xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+xmlns:context="http://www.springframework.org/schema/context"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.mulesoft.org/schema/mule/secure-property-placeholder http://www.mulesoft.org/schema/mule/secure-property-placeholder/current/mule-secure-property-placeholder.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <mulexml:namespace-manager includeConfigNamespaces="true">
+        <mulexml:namespace prefix="soap" uri="http://schemas.xmlsoap.org/soap/envelope/"/>
+        <mulexml:namespace prefix="aria" uri="${aria.namespace}"/>
+    </mulexml:namespace-manager>
+
+    <secure-property-placeholder:config name="Secure_Property_Placeholder" key="${runtime.key}" location="common.properties,hc-${mule.env}.properties,${mule.env}.properties" doc:name="Secure Property Placeholder"/>
+
+    <http:request-config name="MDR_HTTP_Request_Configuration" host="${mdr.system.host}" port="${mdr.system.port}" basePath="/" doc:name="HTTP Request Configuration">
+    </http:request-config>
+
+    <http:request-config name="HTTP_Request_Configuration_to_Sys_Aria"  host="${aria.sys.host}" port="${aria.sys.port}" basePath="/" doc:name="HTTP Request Configuration" protocol="HTTPS"/>
+
+    <http:request-config name="HTTP_Closure_to_Aria"  host="${aria.closure.host}" port="${aria.closure.port}" basePath="/" doc:name="HTTP Request Configuration" protocol="HTTPS" responseTimeout="${response.timeout}"/>
+
+    <sfdc:config name="Salesforce__Basic_Authentication" username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.securityToken}" url="${sfdc.url}" doc:name="Salesforce" doc:description="SFDC Instance" disableSessionInvalidation="true">
+        <sfdc:connection-pooling-profile initialisationPolicy="INITIALISE_ALL" exhaustedAction="WHEN_EXHAUSTED_GROW" maxActive="1" maxIdle="1"/>
+        <reconnect-forever frequency="5000" blocking="false"/>
+    </sfdc:config>
+    <configuration defaultExceptionStrategy-ref="global-exception-strategy" doc:name="Configuration">
+        <http:config useTransportForUris="false"/>
+    </configuration>
+    
+</mule>

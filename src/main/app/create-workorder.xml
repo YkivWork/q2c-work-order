@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" 
+	  xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	  xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	  xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	  xmlns:spring="http://www.springframework.org/schema/beans" 
+	  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	  xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <flow name="workOrderProcessFlow">
+        <dw:transform-message doc:name="Set sfdc response">
+            <dw:set-variable variableName="sfdcResponse" resource="classpath:dataweave/set-sfdcresponse.dwl"/>
+        </dw:transform-message>
+        <logger message="Starting workOrderProcessFlow" level="INFO" doc:name="Logger"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Billing_Company__c,Billing_Address__c,Billing_Split__c,DatasiteOne_Project__c FROM DatasiteOne_Company__c WHERE DatasiteOne_Project__c = '#[flowVars.sfdcResponse.sfdcProjectId]'" doc:name="Salesforce"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%output application/java
+---
+payload map {
+	billing_company_id: $.Billing_Company__c,
+	billing_address_id: $.Billing_Address__c,
+	billing_split: $.Billing_Split__c,
+	project_id: $.DatasiteOne_Project__c
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <flow-ref name="mdrLookupsFlow" doc:name="mdrLookupsFlow"/>
+
+        <logger message="Requesting of Aria - WorkOrder Create;  Sfdc response: #[flowVars.sfdcResponse] &lt;----------&gt; orgMDR response: #[flowVars.orgMDR] &lt;---------&gt; projMDR response: #[flowVars.projMDR]" level="INFO" doc:name="Logger"/>
+
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.sfdcResponse.clientSku == '${closure.media}']">
+                <flow-ref name="closureWorkOrderProcessingFlow" doc:name="closureWorkOrderProcessingFlow"/>
+                <flow-ref name="createClosureWorkOrder" doc:name="createClosureWorkOrder"/>
+            </when>
+            <otherwise>
+                <flow-ref name="nonClosureWorkOrderProcessingFlow" doc:name="nonClosureWorkOrderProcessingFlow"/>
+                <foreach doc:name="For Each">
+                    <logger message="#[message.payloadAs(java.lang.String)]" level="DEBUG" doc:name="Logger"/>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-variable variableName="ariaAcct"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.ariaAcct]]></dw:set-variable>
+                        <dw:set-variable variableName="ariaMPI"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.ariaMPI]]></dw:set-variable>
+                        <dw:set-variable variableName="amount"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.amount]]></dw:set-variable>
+                    </dw:transform-message>
+                    <flow-ref name="createNonClosureWorkOrder" doc:name="createNonClosureWorkOrder"/>
+                </foreach>
+            </otherwise>
+        </choice>
+        <logger message="Ending workOrderProcessFlow" level="INFO" doc:name="Logger"/>
+    </flow>
+
+</mule>

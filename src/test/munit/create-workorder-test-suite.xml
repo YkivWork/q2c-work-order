@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:mock="http://www.mulesoft.org/schema/mule/mock"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:create-workorder.xml"/>
+        <spring:import resource="classpath:globals.xml"/>
+        <spring:import resource="classpath:create-non-closure-wo.xml"/>
+        <spring:import resource="classpath:error-handling.xml"/>
+        <spring:import resource="classpath:create-closure-wo.xml"/>
+        <spring:import resource="classpath:process-non-closure-wo.xml"/>
+        <spring:import resource="classpath:process-closure-wo.xml"/>
+        <spring:import resource="classpath:mdr.xml"/>
+    </spring:beans>
+	<munit:test name="workOrderProcessFlowTransformsCorrectly" description="Test">
+		<mock:when messageProcessor="mule:flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('mdrLookupsFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+		</mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="HTTP_Request_Configuration_to_Aria"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-non-closure-success-response.xml').asString()]" mimeType="application/xml"/>
+        </mock:when>
+        <mock:when messageProcessor=".*:.*" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="Salesforce"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[[{&quot;Billing_Company__c&quot;: &quot;a3ic0000001H9x7AAC&quot;, &quot;Billing_Address__c&quot;: &quot;a3hc0000000FPxaAAG&quot;, &quot;Billing_Split__c&quot;: 0.0, &quot;DatasiteOne_Project__c&quot;: &quot;a27c0000005RduHAAS&quot;}, {&quot;Billing_Company__c&quot;: &quot;a3ic0000001H9xCAAS&quot;, &quot;Billing_Address__c&quot;: &quot;a3hc0000000FPxQAAW&quot;, &quot;Billing_Split__c&quot;: 100.0, &quot;DatasiteOne_Project__c&quot;: &quot;a27c0000005RduHAAS&quot;}]]" mimeType="application/java"/>
+        </mock:when>
+
+		<munit:set payload="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Set Message"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="projMDR"><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+	ariaAcct: "1871743",
+	ariaMPI: "2644240"
+}]]]></dw:set-variable>
+            <dw:set-variable variableName="orgMDR"><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+	ariaAcct: "1871743",
+	split: 100.00
+},{
+	ariaAcct: "1871740",
+	split: 0.0
+}]]]></dw:set-variable>
+        </dw:transform-message>
+
+		<flow-ref name="workOrderProcessFlow" doc:name="workOrderProcessFlow"/>
+        <munit:assert-on-equals expectedValue="#[1]" actualValue="#[payload.size()]" doc:name="Assert Equals"/>
+        <munit:assert-not-null doc:name="Assert Not Null Payload"/>
+	</munit:test>
+    <munit:test name="workorders-closureTest" description="MUnit Test">
+        <mock:when messageProcessor="mule:flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('mdrLookupsFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="HTTP_Closure_to_Aria"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-closure-success-response.xml').asString()]" mimeType="application/xml"/>
+        </mock:when>
+        <mock:when messageProcessor=".*:.*" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="Salesforce"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[[{&quot;Billing_Company__c&quot;: &quot;a3ic0000001H9x7AAC&quot;, &quot;Billing_Address__c&quot;: &quot;a3hc0000000FPxaAAG&quot;, &quot;Billing_Split__c&quot;: 0.0, &quot;DatasiteOne_Project__c&quot;: &quot;a27c0000005RduHAAS&quot;}, {&quot;Billing_Company__c&quot;: &quot;a3ic0000001H9xCAAS&quot;, &quot;Billing_Address__c&quot;: &quot;a3hc0000000FPxQAAW&quot;, &quot;Billing_Split__c&quot;: 100.0, &quot;DatasiteOne_Project__c&quot;: &quot;a27c0000005RduHAAS&quot;}]]" mimeType="application/java"/>
+        </mock:when>
+        <munit:set payload="#[getResource('sfdc-query-closure-response.json').asString()]" mimeType="application/json" doc:name="Set Message"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="projMDR"><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+	ariaAcct: "1871743",
+	ariaMPI: "2644240"
+}]]]></dw:set-variable>
+            <dw:set-variable variableName="orgMDR"><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+	ariaAcct: "1871743",
+	split: 100.00
+},{
+	ariaAcct: "1871740",
+	split: 0.0
+}]]]></dw:set-variable>
+        </dw:transform-message>
+        <flow-ref name="workOrderProcessFlow" doc:name="workOrderProcessFlow"/>
+        <munit:assert-on-equals expectedValue="#[1]" actualValue="#[payload.size()]" doc:name="Assert Equals"/>
+        <munit:assert-not-null doc:name="Assert Not Null Payload"/>
+    </munit:test>
+</mule>

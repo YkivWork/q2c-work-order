@@ -1,0 +1,40 @@
+<aria_workflow_response>
+	<aria_response>
+
+		<api_name>create_order_m</api_name>
+
+		<error_code>0</error_code>
+
+		<error_message/>
+
+		<input_parameters>AccountNumber:2066892;PlanInstanceNumber:3040316</input_parameters>
+
+	</aria_response> 
+	<aria_response>
+
+		<api_name>update_acct_plan_m</api_name>
+
+		<error_code>0</error_code>
+
+		<error_message/>
+
+		<input_parameters>AccountNumber:2066892;PlanInstanceNumber:3040316</input_parameters>
+
+	</aria_response> 
+	<aria_response>
+
+		<api_name>get_acct_plans_all_m</api_name>
+
+		<error_code>0</error_code>
+
+		<error_message/>
+
+		<input_parameters>AccountNumber:2066892;PlanInstanceNumber:3040316</input_parameters>
+
+	</aria_response> 
+	<workflow_response_code>0</workflow_response_code>
+
+	<workflow_response_message>OK</workflow_response_message>
+	<tracking_id/> 
+
+</aria_workflow_response> 

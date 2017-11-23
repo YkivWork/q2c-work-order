@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" 
+	xmlns:json="http://www.mulesoft.org/schema/mule/json"
+    xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <flow name="q2c-work-orderFlow" processingStrategy="synchronous">
+        <poll doc:name="Poll">
+            <fixed-frequency-scheduler frequency="1" timeUnit="MINUTES"/>
+            <watermark variable="sfdcPollWorkOrder" default-expression="${watermark.default.expression}" selector="MAX" selector-expression="#[payload.LastModifiedDate]"/>
+            <processor-chain doc:name="Processor Chain">
+                <logger message="Polling of Salesforce #[flowVars.sfdcPollWorkOrder]" level="INFO" doc:name="Logger"/>
+
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="dsql:SELECT Address_1__c, Address_2__c, Address_3__c, Amount__c, City__c, Client_Order_ID__c, Client_SKU__c, Company_Name__c, Country__c, County__c, DatasiteOne_Project__c, Description__c, Due_Date__c, Email_Address__c, First_Name__c, Hourly_Rate__c, LastModifiedDate, Last_Name__c, Locality__c, Markup__c, Media_Type__c, Name, OwnerId, Phone__c, Postal_Code__c, Quantity__c, RecordTypeId, Service_Location__c, Shipping_Cost__c, State_Province__c, Status__c, Total_Hours_Cost__c, Total_Hours__c, Total_Media_Cost__c, Total_Pages_Scanned__c, Total_Scanning_Cost__c, Total_Shipping_Cost__c, Type_of_Service__c, Units__c FROM Work_Order__c WHERE Status__c = 'Completed' AND LastModifiedDate &gt; #[flowVars.sfdcPollWorkOrder]" doc:name="Salesforce"/>
+            </processor-chain>
+        </poll>
+
+        <foreach doc:name="For Each">
+            <flow-ref name="workOrderProcessFlow" doc:name="workOrderProcessFlow"/>
+        </foreach>
+    </flow>
+
+
+    
+
+</mule>

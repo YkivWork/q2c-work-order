@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:mock="http://www.mulesoft.org/schema/mule/mock"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:create-workorder.xml"/>
+        <spring:import resource="classpath:globals.xml"/>
+        <spring:import resource="classpath:error-handling.xml"/>
+        <spring:import resource="classpath:create-non-closure-wo.xml"/>
+        <spring:import resource="classpath:create-closure-wo.xml"/>
+        <spring:import resource="classpath:process-non-closure-wo.xml"/>
+        <spring:import resource="classpath:process-closure-wo.xml"/>
+        <spring:import resource="classpath:mdr.xml"/>
+    </spring:beans>
+    <munit:test name="mdr-test-suite-mdrLookupsFlowTest" description="Test">
+        <mock:when messageProcessor=".*:.*" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="getCrossReferenceFromORG"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('org-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor=".*:.*" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="getCrossReferenceFromPROJ"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('proj-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[
+ {	billing_company_id: "a3ic0000001H9x7AAC", 
+	billing_address_id: "a3hc0000000FPxaAAG", 
+	billing_split: 0.0, 
+	project_id: "a27c0000005RduHAAS"
+	},
+	{billing_company_id: "a3ic0000001H9xCAAS", 
+	billing_address_id: "a3hc0000000FPxQAAW", 
+	billing_split: 100.0, 
+	project_id: "a27c0000005RduHAAS"
+	}
+]]]></dw:set-payload>
+            <dw:set-variable variableName="sfdcResponse"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	amount: 59.4
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <flow-ref name="mdrLookupsFlow" doc:name="Flow-ref to mdrLookupsFlow"/>
+        <munit:assert-on-equals message="Failed at initializing variable" expectedValue="#[1]" actualValue="#[flowVars.projMDR.size()]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="Failed at initializing variable" expectedValue="#[2]" actualValue="#[flowVars.orgMDR.size()]" doc:name="Assert Equals"/>
+        <munit:assert-not-null doc:name="Assert Not Null Payload" message="Failed at initializing payload"/>
+    </munit:test>
+</mule>
